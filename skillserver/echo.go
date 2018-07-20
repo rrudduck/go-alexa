@@ -6,6 +6,30 @@ import (
 	"time"
 )
 
+type DialogType string
+
+const (
+	DialogDelegate      DialogType = "Dialog.Delegate"
+	DialogElicitSlot    DialogType = "Dialog.ElicitSlot"
+	DialogConfirmSlot   DialogType = "Dialog.ConfirmSlot"
+	DialogConfirmIntent DialogType = "Dialog.ConfirmIntent"
+)
+
+type DialogState string
+
+const (
+	DialogStarted    DialogState = "STARTED"
+	DialogInProgress DialogState = "IN_PROGRESS"
+	DialogCompleted  DialogState = "COMPLETED"
+)
+
+type ConfirmationStatus string
+
+const (
+	ConfirmationConfirmed ConfirmationStatus = "CONFIRMED"
+	ConfirmationDenied    ConfirmationStatus = "DENIED"
+)
+
 // Request Functions
 func (this *EchoRequest) VerifyTimestamp() bool {
 	reqTimestamp, _ := time.Parse("2006-01-02T15:04:05Z", this.Request.Timestamp)
@@ -70,6 +94,14 @@ func (this *EchoRequest) AllSlots() map[string]EchoSlot {
 // Locale returns the locale specified in the request.
 func (this *EchoRequest) Locale() string {
 	return this.Request.Locale
+}
+
+func (this *EchoRequest) GetDialogState() DialogState {
+	return this.Request.DialogState
+}
+
+func (this *EchoRequest) GetIntentConfirmationStatus() ConfirmationStatus {
+	return this.Request.Intent.ConfirmationStatus
 }
 
 // Response Functions
@@ -171,6 +203,57 @@ func (this *EchoResponse) EndSession(flag bool) *EchoResponse {
 	return this
 }
 
+func (this *EchoResponse) DialogDelegate(updatedIntent *EchoIntent) *EchoResponse {
+	this.appendDirective(&DialogDirective{
+		Type:          DialogDelegate,
+		UpdatedIntent: updatedIntent,
+	})
+	this.EndSession(false)
+
+	return this
+}
+
+func (this *EchoResponse) ElicitSlot(slotToElicit string, updatedIntent *EchoIntent) *EchoResponse {
+	this.appendDirective(&DialogDirective{
+		Type:          DialogElicitSlot,
+		SlotToElicit:  slotToElicit,
+		UpdatedIntent: updatedIntent,
+	})
+	this.EndSession(false)
+
+	return this
+}
+
+func (this *EchoResponse) ConfirmSlot(slotToConfirm string, updatedIntent *EchoIntent) *EchoResponse {
+	this.appendDirective(&DialogDirective{
+		Type:          DialogConfirmSlot,
+		SlotToConfirm: slotToConfirm,
+		UpdatedIntent: updatedIntent,
+	})
+	this.EndSession(false)
+
+	return this
+}
+
+func (this *EchoResponse) ConfirmIntent(intentToConfirm string, updatedIntent *EchoIntent) *EchoResponse {
+	this.appendDirective(&DialogDirective{
+		Type:            DialogConfirmIntent,
+		IntentToConfirm: intentToConfirm,
+		UpdatedIntent:   updatedIntent,
+	})
+	this.EndSession(false)
+
+	return this
+}
+
+func (this *EchoResponse) appendDirective(directive *DialogDirective) {
+	if this.Response.Directives == nil {
+		this.Response.Directives = make([]*DialogDirective, 0, 5)
+	}
+
+	this.Response.Directives = append(this.Response.Directives, directive)
+}
+
 func (this *EchoResponse) String() ([]byte, error) {
 	jsonStr, err := json.Marshal(this)
 	if err != nil {
@@ -214,22 +297,25 @@ type EchoContext struct {
 }
 
 type EchoReqBody struct {
-	Type      string     `json:"type"`
-	RequestID string     `json:"requestId"`
-	Timestamp string     `json:"timestamp"`
-	Intent    EchoIntent `json:"intent,omitempty"`
-	Reason    string     `json:"reason,omitempty"`
+	Type        string      `json:"type"`
+	RequestID   string      `json:"requestId"`
+	Timestamp   string      `json:"timestamp"`
+	Intent      EchoIntent  `json:"intent,omitempty"`
+	Reason      string      `json:"reason,omitempty"`
 	Locale    string     `json:"locale,omitempty"`
+	DialogState DialogState `json:"dialogState,omitempty"`
 }
 
 type EchoIntent struct {
-	Name  string              `json:"name"`
-	Slots map[string]EchoSlot `json:"slots"`
+	Name               string              `json:"name"`
+	ConfirmationStatus ConfirmationStatus  `json:"confirmationStatus,omitempty"`
+	Slots              map[string]EchoSlot `json:"slots"`
 }
 
 type EchoSlot struct {
-	Name        string         `json:"name"`
-	Value       string         `json:"value"`
+	Name               string             `json:"name"`
+	ConfirmationStatus ConfirmationStatus `json:"confirmationStatus,omitempty"`
+	Value              string             `json:"value"`
 	Resolutions EchoResolution `json:"resolutions"`
 }
 
@@ -256,11 +342,20 @@ type EchoResponse struct {
 	Response          EchoRespBody           `json:"response"`
 }
 
+type DialogDirective struct {
+	Type            DialogType  `json:"type,omitempty"`
+	SlotToConfirm   string      `json:"slotToConfirm,omitempty"`
+	SlotToElicit    string      `json:"slotToElicit,omitempty"`
+	IntentToConfirm string      `json:"intentToConfirm,omitempty"`
+	UpdatedIntent   *EchoIntent `json:"updatedIntent,omitempty"`
+}
+
 type EchoRespBody struct {
-	OutputSpeech     *EchoRespPayload `json:"outputSpeech,omitempty"`
-	Card             *EchoRespPayload `json:"card,omitempty"`
-	Reprompt         *EchoReprompt    `json:"reprompt,omitempty"` // Pointer so it's dropped if empty in JSON response.
-	ShouldEndSession bool             `json:"shouldEndSession"`
+	OutputSpeech     *EchoRespPayload   `json:"outputSpeech,omitempty"`
+	Card             *EchoRespPayload   `json:"card,omitempty"`
+	Reprompt         *EchoReprompt      `json:"reprompt,omitempty"` // Pointer so it's dropped ifempty in JSON response.
+	Directives       []*DialogDirective `json:"directives,omitempty"`
+	ShouldEndSession bool               `json:"shouldEndSession"`
 }
 
 type EchoReprompt struct {
