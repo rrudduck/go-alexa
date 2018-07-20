@@ -302,7 +302,7 @@ type EchoReqBody struct {
 	Timestamp   string      `json:"timestamp"`
 	Intent      EchoIntent  `json:"intent,omitempty"`
 	Reason      string      `json:"reason,omitempty"`
-	Locale    string     `json:"locale,omitempty"`
+	Locale      string      `json:"locale,omitempty"`
 	DialogState DialogState `json:"dialogState,omitempty"`
 }
 
@@ -316,7 +316,7 @@ type EchoSlot struct {
 	Name               string             `json:"name"`
 	ConfirmationStatus ConfirmationStatus `json:"confirmationStatus,omitempty"`
 	Value              string             `json:"value"`
-	Resolutions EchoResolution `json:"resolutions"`
+	Resolutions        EchoResolution     `json:"resolutions"`
 }
 
 type EchoResolution struct {
@@ -328,9 +328,11 @@ type EchoResolutionPerAuthority struct {
 	Status    struct {
 		Code string `json:"code"`
 	} `json:"status"`
-	Values []map[string]struct {
-		Name string `json:"name"`
-		ID   string `json:"id"`
+	Values []struct {
+		Value struct {
+			Name string `json:"name"`
+			ID   string `json:"id"`
+		} `json:"value"`
 	} `json:"values"`
 }
 
